@@ -22,7 +22,57 @@ def init_stats():
 @st.cache_data
 def load_matches():
     urls = [
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/fr.1.json"
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/fr.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/fr.2.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/at.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/at.2.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/au.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/be.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/de.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/de.2.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/eg.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/en.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/en.2.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/en.3.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/en.4.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/es.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/es.2.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/gr.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/it.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/it.2.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/nl.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/pt.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/sco.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/tr.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2025/ar.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2025/br.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2025/cn.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2025/co.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2025/copa.l.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2025/jp.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2025/mls.json",
+  
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/at.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/de.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/de.2.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/en.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/en.2.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/es.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/fr.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/it.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/nl.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/pt.1.json",
+  
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/at.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/de.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/de.2.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/en.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/en.2.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/es.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/fr.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/it.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/nl.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/pt.1.json"
     ]
     all_matches = []
     for url in urls:
