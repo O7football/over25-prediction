@@ -7,6 +7,9 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
 
+# === Streamlit Page Config ===
+st.set_page_config(page_title="O7 Predictor", layout="centered")
+
 # === Utility ===
 def init_stats():
     return {
@@ -222,11 +225,12 @@ def predict_upcoming_matches(model, matches, date_input, rankings):
     return predictions
 
 # === Streamlit UI ===
-st.title("Football Match Predictor")
-st.write("Enter a date to predict matches with over 2.5 goals")
+st.markdown("<h1 style='text-align: center; color: #007BFF;'>WELCOME TO O7</h1>", unsafe_allow_html=True)
 
-date_input = st.date_input("Choose a date")
-run = st.button("Start Prediction")
+date_input = st.text_input(" ", placeholder="INPUT YYYY-MM-DD")
+start_col = st.columns([1, 1, 1])
+with start_col[1]:
+    run = st.button("START", use_container_width=True)
 
 if run:
     with st.spinner("Training model and making predictions..."):
@@ -242,11 +246,11 @@ if run:
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
             model = RandomForestClassifier(n_estimators=100, random_state=42)
             model.fit(X_train, y_train)
-            results = predict_upcoming_matches(model, matches, date_input.strftime("%Y-%m-%d"), rankings)
+            results = predict_upcoming_matches(model, matches, date_input.strip(), rankings)
 
             if results:
                 st.success("Predictions Complete")
                 for t1, t2, prob in results:
                     st.markdown(f"**{t1} vs {t2}** => OVER 2.5 prob: **{prob:.2f}**")
             else:
-                st.warning("No strong predictions (prob >= 0.8) found for the selected date.")
+                st.warning("No strong predictions (prob >= 0.0) found for the selected date.")
