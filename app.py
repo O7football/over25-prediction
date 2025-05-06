@@ -6,9 +6,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
 from datetime import date
 
-# === INIT ===
-st.set_page_config(page_title="Football Over 2.5 Predictor", layout="wide")
-
+# === FUNCTIONS ===
 def init_team_stats():
     return {
         "games": 0, "goals_for": 0, "goals_against": 0, "over35": 0,
@@ -22,7 +20,10 @@ def load_all_matches(urls):
         try:
             res = requests.get(url)
             if res.status_code == 200:
-                all_matches.extend(res.json().get("matches", []))
+                data = res.json()
+                all_matches.extend(data.get("matches", []))
+            else:
+                st.warning(f"Failed to load {url} (Status code: {res.status_code})")
         except Exception as e:
             st.warning(f"Error loading {url}: {e}")
     return all_matches
@@ -99,7 +100,6 @@ def train_model(df):
 
 def predict_date_matches(model, matches, date_str):
     predictions = []
-
     for match in matches:
         if match.get("date") != date_str or match.get("score"):
             continue
@@ -136,19 +136,67 @@ def predict_date_matches(model, matches, date_str):
             "Prediction": "OVER 2.5" if pred else "NO OVER",
             "Confidence": round(prob, 2)
         })
-
     return pd.DataFrame(predictions)
 
 # === STREAMLIT GUI ===
+st.set_page_config(page_title="Football Over 2.5 Predictor", layout="wide")
 st.title("Football Over 2.5 Goal Predictor")
 st.markdown("Predict if a match will have more than 2.5 goals based on historical data.")
 
 with st.spinner("Loading match data..."):
     urls = [
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/it.1.json",
+        # ALL datasets from your list...
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/fr.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/fr.2.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/at.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/at.2.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/au.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/be.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/de.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/de.2.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/eg.1.json",
         "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/en.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/en.2.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/en.3.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/en.4.json",
         "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/es.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/es.2.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/gr.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/it.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/it.2.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/nl.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/pt.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/sco.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/tr.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2025/ar.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2025/br.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2025/cn.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2025/co.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2025/copa.l.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2025/jp.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2025/mls.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/at.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/de.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/de.2.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/en.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/en.2.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/es.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/fr.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/it.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/nl.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/pt.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/at.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/de.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/de.2.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/en.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/en.2.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/es.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/fr.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/it.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/nl.1.json",
+        "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/pt.1.json"
     ]
+
     matches = load_all_matches(urls)
     df = extract_features(matches)
 
@@ -158,7 +206,6 @@ else:
     model, report = train_model(df)
     st.success("Model trained successfully.")
 
-    # Date picker
     selected_date = st.date_input("Select a match date", value=date.today())
     selected_date_str = selected_date.strftime("%Y-%m-%d")
 
@@ -172,4 +219,4 @@ else:
 
     if st.checkbox("Show model evaluation report"):
         st.json(report)
-        
+    
