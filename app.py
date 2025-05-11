@@ -1,222 +1,284 @@
 import streamlit as st
-import pandas as pd
 import requests
+from datetime import datetime
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report
-from datetime import date
+from sklearn.metrics import roc_auc_score
+import pandas as pd
+import numpy as np
 
-# === FUNCTIONS ===
-def init_team_stats():
-    return {
-        "games": 0, "goals_for": 0, "goals_against": 0, "over35": 0,
-        "home_games": 0, "home_over35": 0,
-        "away_games": 0, "away_over35": 0
-    }
+st.set_page_config(page_title="Predittore Over 2.5", layout="wide")
+st.title("Modello Predittivo Over 2.5 – Random Forest")
 
-def load_all_matches(urls):
+# --- CONFIG ---
+FINESTRE = [3, 5, 10, 15]
+URLS = [
+    "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/fr.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/fr.2.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/at.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/at.2.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/au.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/be.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/de.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/de.2.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/eg.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/en.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/en.2.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/en.3.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/en.4.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/es.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/es.2.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/gr.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/it.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/it.2.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/nl.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/pt.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/sco.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/tr.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2025/ar.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2025/br.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2025/cn.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2025/co.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2025/copa.l.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2025/jp.1.json",
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2025/mls.json" ]
+@st.cache_data(show_spinner=False)
+def fetch_matches():
     all_matches = []
-    for url in urls:
+    for url in URLS:
         try:
-            res = requests.get(url)
-            if res.status_code == 200:
-                data = res.json()
-                all_matches.extend(data.get("matches", []))
-            else:
-                st.warning(f"Failed to load {url} (Status code: {res.status_code})")
+            response = requests.get(url)
+            response.raise_for_status()
+            data = response.json()
+            for match in data.get("matches", []):
+                if "score" in match and match["score"].get("ft"):
+                    match["league"] = data.get("name", "")
+                    all_matches.append(match)
         except Exception as e:
-            st.warning(f"Error loading {url}: {e}")
+            st.warning(f"Errore su {url}: {e}")
     return all_matches
-
-def update_stats(stats, match, team_name, is_home):
-    team1, team2 = match["team1"], match["team2"]
-    g1, g2 = match["score"]["ft"]
-    total = g1 + g2
-
-    stats["games"] += 1
-    if team_name == team1:
-        stats["goals_for"] += g1
-        stats["goals_against"] += g2
-    else:
-        stats["goals_for"] += g2
-        stats["goals_against"] += g1
-
-    stats["over35"] += int(total > 3)
-
-    if is_home:
-        stats["home_games"] += 1
-        stats["home_over35"] += int(total > 3)
-    else:
-        stats["away_games"] += 1
-        stats["away_over35"] += int(total > 3)
 
 def safe_div(a, b):
     return a / b if b else 0
 
-def extract_features(matches):
-    rows = []
-    for match in matches:
-        if "score" not in match or not match["score"].get("ft"):
+def calcola_punti(team, matches):
+    win, draw = 0, 0
+    for m in matches:
+        if team not in (m["team1"], m["team2"]):
+            continue
+        ft = m.get("score", {}).get("ft", [0, 0])
+        if not ft:
+            continue
+        g1, g2 = ft
+        if m["team1"] == team:
+            if g1 > g2: win += 1
+            elif g1 == g2: draw += 1
+        elif m["team2"] == team:
+            if g2 > g1: win += 1
+            elif g2 == g1: draw += 1
+    return win * 3 + draw
+
+def gol_per_finestra(team, matches, finestre=FINESTRE):
+    risultati = {f"gol_{f}": 0 for f in finestre}
+    partite = []
+    for m in matches:
+        if team not in (m["team1"], m["team2"]):
+            continue
+        ft = m.get("score", {}).get("ft")
+        if not ft:
+            continue
+        try:
+            d = datetime.strptime(m["date"], "%Y-%m-%d")
+            g = ft[0] if m["team1"] == team else ft[1]
+            partite.append((d, g))
+        except:
+            continue
+    partite.sort(reverse=True)
+    for f in finestre:
+        risultati[f"gol_{f}"] = sum(g for _, g in partite[:f])
+    return risultati
+def calcola_forma_agile(gol_data):
+    score = 0
+    if safe_div(gol_data['gol_3'], 3) >= 1.5:
+        score += 2
+    if safe_div(gol_data['gol_5'], 5) >= 1.4:
+        score += 1
+    if safe_div(gol_data['gol_10'], 10) >= 1.3:
+        score += 1
+    return score
+
+def ultima_over35(team, matches):
+    partite = []
+    for m in matches:
+        if team not in (m['team1'], m['team2']):
+            continue
+        ft = m.get('score', {}).get('ft')
+        if not ft:
+            continue
+        try:
+            d = datetime.strptime(m['date'], "%Y-%m-%d")
+            partite.append((d, sum(ft)))
+        except:
+            continue
+    if not partite:
+        return 0
+    partite.sort(reverse=True)
+    return 1 if partite[0][1] > 3 else 0
+
+@st.cache_data(show_spinner=False)
+def build_dataset(matches):
+    records = []
+    for m in matches:
+        ft = m.get('score', {}).get('ft')
+        if not ft:
+            continue
+        total_goals = sum(ft)
+        label = 1 if total_goals >= 3 else 0
+
+        team1, team2 = m['team1'], m['team2']
+        date_m = datetime.strptime(m['date'], "%Y-%m-%d")
+        past_matches = [
+            x for x in matches if x.get('score', {}).get('ft') and datetime.strptime(x['date'], "%Y-%m-%d") < date_m
+        ]
+
+        if not past_matches:
             continue
 
-        home, away = match["team1"], match["team2"]
-        g1, g2 = match["score"]["ft"]
-        total_goals = g1 + g2
+        f_team1 = gol_per_finestra(team1, past_matches)
+        f_team2 = gol_per_finestra(team2, past_matches)
+        punti1 = calcola_punti(team1, past_matches)
+        punti2 = calcola_punti(team2, past_matches)
+        overcorr1 = ultima_over35(team1, past_matches)
+        overcorr2 = ultima_over35(team2, past_matches)
+        forma1 = calcola_forma_agile(f_team1)
+        forma2 = calcola_forma_agile(f_team2)
 
-        home_stats, away_stats = init_team_stats(), init_team_stats()
-
-        for past in matches:
-            if past == match or "score" not in past or not past["score"].get("ft"):
-                continue
-
-            if home in (past["team1"], past["team2"]):
-                update_stats(home_stats, past, home, home == past["team1"])
-            if away in (past["team1"], past["team2"]):
-                update_stats(away_stats, past, away, away == past["team1"])
-
-        if home_stats["games"] < 3 or away_stats["games"] < 3:
-            continue
-
-        row = {
-            "home_avg_goals": safe_div(home_stats["goals_for"] + home_stats["goals_against"], home_stats["games"]),
-            "away_avg_goals": safe_div(away_stats["goals_for"] + away_stats["goals_against"], away_stats["games"]),
-            "home_over35_rate": safe_div(home_stats["over35"], home_stats["games"]),
-            "away_over35_rate": safe_div(away_stats["over35"], away_stats["games"]),
-            "home_over35_home": safe_div(home_stats["home_over35"], home_stats["home_games"]),
-            "away_over35_away": safe_div(away_stats["away_over35"], away_stats["away_games"]),
-            "avg_match_goal": safe_div((home_stats["goals_for"] + away_stats["goals_for"]), 2),
-            "label": int(total_goals > 2.5)
+        features = {
+            **{f"{k}_casa": v for k, v in f_team1.items()},
+            **{f"{k}_ospite": v for k, v in f_team2.items()},
+            "punti_casa": punti1,
+            "punti_ospite": punti2,
+            "overcorr_casa": overcorr1,
+            "overcorr_ospite": overcorr2,
+            "forma_agile_casa": forma1,
+            "forma_agile_ospite": forma2,
+            "over25_label": label
         }
-        rows.append(row)
-    return pd.DataFrame(rows)
+        records.append(features)
 
+    df = pd.DataFrame(records)
+    return df.dropna()
 def train_model(df):
-    X = df.drop("label", axis=1)
-    y = df["label"]
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
-    model = RandomForestClassifier(n_estimators=100, random_state=42)
-    model.fit(X_train, y_train)
-    return model, classification_report(y_test, model.predict(X_test), output_dict=True)
+    X = df.drop(columns=["over25_label"])
+    y = df["over25_label"]
 
-def predict_date_matches(model, matches, date_str):
-    predictions = []
-    for match in matches:
-        if match.get("date") != date_str or match.get("score"):
-            continue
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-        home, away = match["team1"], match["team2"]
-        home_stats, away_stats = init_team_stats(), init_team_stats()
+    clf = RandomForestClassifier(n_estimators=100, random_state=42)
+    clf.fit(X_train, y_train)
 
-        for past in matches:
-            if "score" not in past or not past["score"].get("ft"):
-                continue
-            if home in (past["team1"], past["team2"]):
-                update_stats(home_stats, past, home, home == past["team1"])
-            if away in (past["team1"], past["team2"]):
-                update_stats(away_stats, past, away, away == past["team1"])
+    y_pred_prob = clf.predict_proba(X_test)[:, 1]
+    auc = roc_auc_score(y_test, y_pred_prob)
+    st.subheader("Performance del Modello")
+    st.markdown(f"**AUC ROC**: `{auc:.4f}`")
 
-        if home_stats["games"] < 3 or away_stats["games"] < 3:
-            continue
+    # Importanza delle feature
+    importanze = clf.feature_importances_
+    df_importanza = pd.DataFrame({
+        "feature": X.columns,
+        "importanza": importanze
+    }).sort_values(by="importanza", ascending=False)
 
-        row = pd.DataFrame([{
-            "home_avg_goals": safe_div(home_stats["goals_for"] + home_stats["goals_against"], home_stats["games"]),
-            "away_avg_goals": safe_div(away_stats["goals_for"] + away_stats["goals_against"], away_stats["games"]),
-            "home_over35_rate": safe_div(home_stats["over35"], home_stats["games"]),
-            "away_over35_rate": safe_div(away_stats["over35"], away_stats["games"]),
-            "home_over35_home": safe_div(home_stats["home_over35"], home_stats["home_games"]),
-            "away_over35_away": safe_div(away_stats["away_over35"], away_stats["away_games"]),
-            "avg_match_goal": safe_div((home_stats["goals_for"] + away_stats["goals_for"]), 2)
-        }])
+    st.markdown("**Importanza delle Feature**")
+    st.dataframe(df_importanza.reset_index(drop=True))
 
-        pred = model.predict(row)[0]
-        prob = model.predict_proba(row)[0][1]
-
-        predictions.append({
-            "Match": f"{home} vs {away}",
-            "Prediction": "OVER 2.5" if pred else "NO OVER",
-            "Confidence": round(prob, 2)
-        })
-    return pd.DataFrame(predictions)
-
-# === STREAMLIT GUI ===
-st.set_page_config(page_title="Football Over 2.5 Predictor", layout="wide")
-st.title("Football Over 2.5 Goal Predictor")
-st.markdown("Predict if a match will have more than 2.5 goals based on historical data.")
-
-with st.spinner("Loading match data..."):
-    urls = [
-        # ALL datasets from your list...
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/fr.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/fr.2.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/at.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/at.2.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/au.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/be.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/de.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/de.2.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/eg.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/en.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/en.2.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/en.3.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/en.4.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/es.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/es.2.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/gr.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/it.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/it.2.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/nl.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/pt.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/sco.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2024-25/tr.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2025/ar.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2025/br.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2025/cn.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2025/co.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2025/copa.l.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2025/jp.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2025/mls.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/at.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/de.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/de.2.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/en.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/en.2.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/es.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/fr.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/it.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/nl.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2023-24/pt.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/at.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/de.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/de.2.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/en.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/en.2.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/es.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/fr.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/it.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/nl.1.json",
-        "https://raw.githubusercontent.com/openfootball/football.json/master/2022-23/pt.1.json"
+    return clf, X.columns.tolist()
+def predict_next_matches(model, all_matches, feature_names, data_analisi):
+    upcoming = [
+        m for m in all_matches 
+        if not m.get("score", {}).get("ft") and m["date"] >= data_analisi.strftime("%Y-%m-%d")
     ]
 
-    matches = load_all_matches(urls)
-    df = extract_features(matches)
+    if not upcoming:
+        st.warning("Nessuna partita trovata per la data selezionata.")
+        return
 
-if df.empty:
-    st.error("Not enough data to train the model.")
-else:
-    model, report = train_model(df)
-    st.success("Model trained successfully.")
+    risultati = []
 
-    selected_date = st.date_input("Select a match date", value=date.today())
-    selected_date_str = selected_date.strftime("%Y-%m-%d")
+    for m in upcoming:
+        team1, team2 = m["team1"], m["team2"]
+        date_m = datetime.strptime(m["date"], "%Y-%m-%d")
+        past = [
+            x for x in all_matches 
+            if x.get("score", {}).get("ft") and datetime.strptime(x["date"], "%Y-%m-%d") < date_m
+        ]
 
-    if st.button("Predict Matches"):
-        results = predict_date_matches(model, matches, selected_date_str)
-        if not results.empty:
-            st.subheader(f"Predictions for {selected_date_str}")
-            st.dataframe(results)
-        else:
-            st.info("No matches found for this date or not enough past data.")
+        if not past:
+            continue
 
-    if st.checkbox("Show model evaluation report"):
-        st.json(report)
+        f_team1 = gol_per_finestra(team1, past)
+        f_team2 = gol_per_finestra(team2, past)
+        punti1 = calcola_punti(team1, past)
+        punti2 = calcola_punti(team2, past)
+        overcorr1 = ultima_over35(team1, past)
+        overcorr2 = ultima_over35(team2, past)
+        forma1 = calcola_forma_agile(f_team1)
+        forma2 = calcola_forma_agile(f_team2)
+
+        feat = {
+            **{f"{k}_casa": v for k, v in f_team1.items()},
+            **{f"{k}_ospite": v for k, v in f_team2.items()},
+            "punti_casa": punti1,
+            "punti_ospite": punti2,
+            "overcorr_casa": overcorr1,
+            "overcorr_ospite": overcorr2,
+            "forma_agile_casa": forma1,
+            "forma_agile_ospite": forma2
+        }
+
+        if not set(feature_names).issubset(feat.keys()):
+            continue
+
+        row = np.array([feat[k] for k in feature_names]).reshape(1, -1)
+        prob = model.predict_proba(row)[0, 1]
+        risultati.append({
+            "data": m["date"],
+            "match": f"{team1} vs {team2}",
+            "probabilità Over 2.5": round(prob, 2),
+            "decisione": "GIOCA" if prob >= 0.7 else "NON GIOCARE"
+        })
+
+    if risultati:
+        st.subheader(f"Previsioni Over 2.5 dal {data_analisi.strftime('%Y-%m-%d')}")
+        df_result = pd.DataFrame(risultati)
+        st.dataframe(df_result)
+    else:
+        st.info("Nessuna previsione disponibile.")
+        def main():
+    st.sidebar.header("Parametri")
+    use_today = st.sidebar.radio("Seleziona la data per l'analisi:", ["Oggi", "Data personalizzata"])
+
+    if use_today == "Oggi":
+        data_analisi = datetime.now()
+    else:
+        data_analisi = st.sidebar.date_input("Scegli la data", datetime.now())
+
+    st.info("Caricamento e preparazione dei dati...")
+
+    all_matches = fetch_matches()
+    if not all_matches:
+        st.stop()
+
+    df = build_dataset(all_matches)
+    if df.empty:
+        st.error("Dataset vuoto. Controlla i dati disponibili.")
+        st.stop()
+
+    model, feature_names = train_model(df)
+
+    st.success("Modello pronto! Ora puoi analizzare le partite future.")
+    predict_next_matches(model, all_matches, feature_names, data_analisi)
+
+if __name__ == "__main__":
+    main()
     
