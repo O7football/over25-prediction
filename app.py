@@ -41,7 +41,9 @@ URLS = [
   "https://raw.githubusercontent.com/openfootball/football.json/master/2025/co.1.json",
   "https://raw.githubusercontent.com/openfootball/football.json/master/2025/copa.l.json",
   "https://raw.githubusercontent.com/openfootball/football.json/master/2025/jp.1.json",
-  "https://raw.githubusercontent.com/openfootball/football.json/master/2025/mls.json" ]
+  "https://raw.githubusercontent.com/openfootball/football.json/master/2025/mls.json"
+]
+
 @st.cache_data(show_spinner=False)
 def fetch_matches():
     all_matches = []
@@ -97,6 +99,7 @@ def gol_per_finestra(team, matches, finestre=FINESTRE):
     for f in finestre:
         risultati[f"gol_{f}"] = sum(g for _, g in partite[:f])
     return risultati
+
 def calcola_forma_agile(gol_data):
     score = 0
     if safe_div(gol_data['gol_3'], 3) >= 1.5:
@@ -168,6 +171,7 @@ def build_dataset(matches):
 
     df = pd.DataFrame(records)
     return df.dropna()
+
 def train_model(df):
     X = df.drop(columns=["over25_label"])
     y = df["over25_label"]
@@ -182,7 +186,6 @@ def train_model(df):
     st.subheader("Performance del Modello")
     st.markdown(f"**AUC ROC**: `{auc:.4f}`")
 
-    # Importanza delle feature
     importanze = clf.feature_importances_
     df_importanza = pd.DataFrame({
         "feature": X.columns,
@@ -193,6 +196,7 @@ def train_model(df):
     st.dataframe(df_importanza.reset_index(drop=True))
 
     return clf, X.columns.tolist()
+
 def predict_next_matches(model, all_matches, feature_names, data_analisi):
     upcoming = [
         m for m in all_matches 
@@ -254,7 +258,8 @@ def predict_next_matches(model, all_matches, feature_names, data_analisi):
         st.dataframe(df_result)
     else:
         st.info("Nessuna previsione disponibile.")
-        def main():
+
+def main():
     st.sidebar.header("Parametri")
     use_today = st.sidebar.radio("Seleziona la data per l'analisi:", ["Oggi", "Data personalizzata"])
 
